@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>管理后台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white p-8">
+    <h1 class="text-2xl font-bold mb-6">管理后台</h1>
+    
+    <h2 class="text-xl font-semibold mb-4">待确认充值</h2>
+    <div id="orders" class="space-y-4"></div>
+    
+    <h2 class="text-xl font-semibold mt-8 mb-4">用户列表</h2>
+    <div id="users" class="space-y-2"></div>
+
+    <script>
+    const API = '..';
+    
+    async function loadOrders() {
+        // 简化版：只显示所有订单
+        document.getElementById('orders').innerHTML = '<p class="text-slate-400">请在服务器端查看数据库确认充值</p>';
+    }
+    
+    async function loadUsers() {
+        const res = await fetch(API + '/api/users');
+        const data = await res.json();
+        document.getElementById('users').innerHTML = data.map(u => 
+            '<div class="p-4 bg-slate-800 rounded">' + u.username + ' | 余额: ' + u.balance + ' 次 | ' + u.created_at + '</div>'
+        ).join('');
+    }
+    
+    loadOrders();
+    loadUsers();
+    </script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章配图生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { accent: '#CA8A04', bg: '#0C0A09', card: '#1C1917' },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #0C0A09; color: #FAFAF9; font-family: 'Inter', sans-serif; }
+        .card { background: linear-gradient(135deg, #1C1917, #27272a); border-radius: 1.5rem; }
+        .btn { background: linear-gradient(135deg, #CA8A04, #EAB308); transition: 0.3s; }
+        .btn:hover { box-shadow: 0 0 30px rgba(202,138,4,0.4); }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen p-4">
+    <div class="max-w-lg mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold gradient-text" style="background: linear-gradient(135deg, #CA8A04, #EAB308); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                文章配图生成器
+            </h1>
+            <p class="text-slate-400 text-sm mt-2">0.5元/次 | 1 USDT = 20次</p>
+        </header>
+
+        <!-- 首页 -->
+        <div id="homePage">
+            <div class="card p-6 mb-4">
+                <div class="flex justify-end mb-4">
+                    <button onclick="showAuth()" id="topBtn" class="text-sm text-slate-400">登录/注册</button>
+                </div>
+                
+                <div id="userInfo" class="hidden text-sm text-slate-400 mb-4 flex justify-between items-center">
+                    <span id="userDisplay"></span>
+                    <button onclick="logout()" class="text-slate-400">退出</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div onclick="selectStyle('cartoon')" id="styleCartoon" class="cursor-pointer rounded-2xl p-4 border border-slate-700 active" style="border-color: #CA8A04; background: rgba(202,138,4,0.1);">
+                        <div class="text-center">
+                            <div class="text-2xl">🎨</div>
+                            <h3 class="font-semibold">卡通风格</h3>
+                        </div>
+                    </div>
+                    <div onclick="selectStyle('blackboard')" id="styleBlackboard" class="cursor-pointer rounded-2xl p-4 border border-slate-700">
+                        <div class="text-center">
+                            <div class="text-2xl">🖼️</div>
+                            <h3 class="font-semibold">黑板报风格</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <textarea id="content" class="w-full h-40 p-4 rounded bg-slate-800 border border-slate-700 mb-4 resize-none" placeholder="粘贴文章内容..."></textarea>
+                
+                <button onclick="generate()" id="genBtn" class="btn w-full py-4 rounded font-semibold text-black">生成配图</button>
+            </div>
+
+            <!-- 用户功能区 -->
+            <div id="userSection" class="hidden grid grid-cols-2 gap-4 mb-4">
+                <button onclick="showRecharge()" class="card p-4 text-center">
+                    <div class="text-2xl mb-2">💰</div>
+                    <div class="font-semibold">充值</div>
+                </button>
+                <button onclick="showOrders()" class="card p-4 text-center">
+                    <div class="text-2xl mb-2">📋</div>
+                    <div class="font-semibold">我的订单</div>
+                </button>
+            </div>
+
+            <!-- 结果区 -->
+            <div id="result" class="card p-6 hidden">
+                <button onclick="downloadImg()" class="btn px-6 py-2 rounded font-semibold text-black mb-4">💾 保存图片</button>
+                <img id="img" class="w-full rounded cursor-pointer" onclick="window.open(this.src)">
+            </div>
+        </div>
+
+        <!-- 充值页 -->
+        <div id="rechargePage" class="card p-6 hidden">
+            <button onclick="showHome()" class="text-slate-400 mb-4">← 返回</button>
+            <h2 class="font-semibold text-xl mb-4">充值 USDT (TRC20)</h2>
+            <p class="text-slate-400 text-sm mb-4">地址: <code class="bg-slate-800 px-2 py-1 rounded">TMwNkxTKRPE7DDiXPkzm6hXQ1LV9aQ9gfN</code></p>
+            <div class="grid grid-cols-3 gap-2 mb-4">
+                <button onclick="setAmount(1)" class="py-2 rounded border border-slate-700">1 USDT</button>
+                <button onclick="setAmount(2)" class="py-2 rounded border border-slate-700">2 USDT</button>
+                <button onclick="setAmount(5)" class="py-2 rounded border border-slate-700">5 USDT</button>
+            </div>
+            <input id="rechargeAmount" type="number" value="1" class="w-full p-3 rounded bg-slate-800 border border-slate-700 mb-4">
+            <button onclick="createOrder()" class="btn w-full py-3 rounded font-semibold text-black">创建充值订单</button>
+        </div>
+
+        <!-- 订单页 -->
+        <div id="ordersPage" class="card p-6 hidden">
+            <button onclick="showHome()" class="text-slate-400 mb-4">← 返回</button>
+            <h2 class="font-semibold text-xl mb-4">我的订单</h2>
+            <div id="ordersList" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <!-- 登录/注册弹窗 -->
+    <div id="authModal" class="hidden fixed inset-0 bg-black/90 items-center justify-center z-50 p-4">
+        <div class="card p-6 max-w-sm w-full">
+            <div class="flex gap-4 mb-6">
+                <button onclick="showAuth('login')" id="loginTab" class="flex-1 py-2 rounded border border-slate-700">登录</button>
+                <button onclick="showAuth('register')" id="regTab" class="flex-1 py-2 rounded border border-slate-700">注册</button>
+            </div>
+            <input id="username" class="w-full p-3 rounded bg-slate-800 border border-slate-700 mb-4" placeholder="用户名">
+            <input id="password" type="password" class="w-full p-3 rounded bg-slate-800 border border-slate-700 mb-4" placeholder="密码">
+            <button onclick="auth()" id="authBtn" class="btn w-full py-3 rounded font-semibold text-black">登录</button>
+            <p id="authError" class="text-red-400 text-sm mt-4 hidden"></p>
+            <button onclick="closeAuth()" class="w-full py-3 mt-4 text-slate-400">取消</button>
+        </div>
+    </div>
+
+    <script>
+    const API = '';
+    let user = null;
+    let style = 'cartoon';
+    let rechargeAmt = 1;
+
+    async function checkUser() {
+        const res = await fetch('/api/me');
+        const data = await res.json();
+        if (data.ok) {
+            user = data.user;
+            document.getElementById('topBtn').classList.add('hidden');
+            document.getElementById('userInfo').classList.remove('hidden');
+            document.getElementById('userDisplay').textContent = user.username + ' | 余额: ' + user.balance + ' 次';
+            document.getElementById('userSection').classList.remove('hidden');
+        } else {
+            document.getElementById('topBtn').classList.remove('hidden');
+            document.getElementById('userInfo').classList.add('hidden');
+            document.getElementById('userSection').classList.add('hidden');
+        }
+    }
+    checkUser();
+
+    function showAuth(type = 'login') {
+        document.getElementById('authModal').classList.remove('hidden');
+        document.getElementById('authModal').classList.add('flex');
+        document.getElementById('authBtn').dataset.type = type;
+        document.getElementById('authBtn').textContent = type === 'login' ? '登录' : '注册';
+        document.getElementById('loginTab').style.background = type === 'login' ? 'rgba(202,138,4,0.2)' : '';
+        document.getElementById('regTab').style.background = type === 'register' ? 'rgba(202,138,4,0.2)' : '';
+    }
+    closeAuth = () => {
+        document.getElementById('authModal').classList.add('hidden');
+        document.getElementById('authModal').classList.remove('flex');
+    };
+
+    async function auth() {
+        const type = document.getElementById('authBtn').dataset.type;
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const res = await fetch('/api/' + type, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            user = data.user;
+            closeAuth();
+            location.reload();
+        } else {
+            document.getElementById('authError').textContent = data.error;
+            document.getElementById('authError').classList.remove('hidden');
+        }
+    }
+
+    async function logout() {
+        await fetch('/api/logout', { method: 'POST' });
+        user = null;
+        location.reload();
+    }
+
+    function selectStyle(s) {
+        style = s;
+        document.getElementById('styleCartoon').style.borderColor = s === 'cartoon' ? '#CA8A04' : '';
+        document.getElementById('styleBlackboard').style.borderColor = s === 'blackboard' ? '#CA8A04' : '';
+    }
+
+    function setAmount(n) {
+        rechargeAmt = n;
+        document.getElementById('rechargeAmount').value = n;
+    }
+
+    function showHome() {
+        document.getElementById('homePage').classList.remove('hidden');
+        document.getElementById('rechargePage').classList.add('hidden');
+        document.getElementById('ordersPage').classList.add('hidden');
+    }
+
+    function showRecharge() {
+        document.getElementById('homePage').classList.add('hidden');
+        document.getElementById('rechargePage').classList.remove('hidden');
+        document.getElementById('ordersPage').classList.add('hidden');
+    }
+
+    function showOrders() {
+        document.getElementById('homePage').classList.add('hidden');
+        document.getElementById('rechargePage').classList.add('hidden');
+        document.getElementById('ordersPage').classList.remove('hidden');
+        loadOrders();
+    }
+
+    async function createOrder() {
+        const res = await fetch('/api/order', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ amount: rechargeAmt })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            alert('订单 #' + data.orderId + '\n\n地址: ' + data.address + '\n金额: ' + data.amount + ' USDT\n\n转账后联系管理员确认');
+        } else {
+            alert(data.error || '请先登录');
+        }
+    }
+
+    async function loadOrders() {
+        const res = await fetch('/api/orders');
+        const data = await res.json();
+        if (data.ok) {
+            document.getElementById('ordersList').innerHTML = data.orders.map(o => 
+                '<div class="p-4 bg-slate-800 rounded"><div>#' + o.id + ' | ' + o.amount + ' USDT | 状态: ' + o.status + '</div><div class="text-slate-400 text-sm">' + o.created_at + '</div></div>'
+            ).join('') || '<p class="text-slate-400">暂无订单</p>';
+        }
+    }
+
+    async function generate() {
+        const content = document.getElementById('content').value.trim();
+        if (!content) { alert('请输入内容'); return; }
+        
+        const btn = document.getElementById('genBtn');
+        btn.disabled = true;
+        btn.textContent = '生成中...';
+        
+        try {
+            const res = await fetch('/api/generate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ content, style })
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                document.getElementById('img').src = data.image;
+                document.getElementById('result').classList.remove('hidden');
+                
+                if (user) {
+                    const res = await fetch('/api/me');
+                    const d = await res.json();
+                    if (d.ok) {
+                        user = d.user;
+                        document.getElementById('userDisplay').textContent = user.username + ' | 余额: ' + user.balance + ' 次';
+                    }
+                }
+            } else {
+                if (data.needRecharge || data.needLogin) {
+                    alert(data.error);
+                    showAuth();
+                } else {
+                    alert(data.error || '生成失败');
+                }
+            }
+        } catch (e) {
+            alert('生成失败: ' + e.message);
+        }
+        
+        btn.disabled = false;
+        btn.textContent = '生成配图';
+    }
+
+    function downloadImg() {
+        const img = document.getElementById('img');
+        const a = document.createElement('a');
+        a.href = img.src;
+        a.download = 'image-' + Date.now() + '.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+    </script>
+</body>
+</html>
