@@ -184,3 +184,10 @@ app.get('/api/admin/orders', (req, res) => {
   `).all();
   res.json(orders);
 });
+
+// Admin API: 调整用户余额
+app.post('/api/admin/adjust', (req, res) => {
+  const { userId, amount } = req.body;
+  db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
+  res.json({ ok: true });
+});
