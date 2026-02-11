@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 const app = express();
 const db = new Database(join(__dirname, 'data.db'));
 
-const API_KEY = 'AIzaSyCWZhr9vVaNJHXULNCxhN1gtWg4tbCmlFo';
+const GEMINI_PROXY = 'https://super-snow-5f38.11962260.workers.dev/generate';
 
 const PROMPTS = {
   cartoon: `请根据输入内容提取核心主题与要点，生成一张卡通风格的信息图：
@@ -120,18 +120,19 @@ app.post('/api/generate', async (req, res) => {
   const prompt = PROMPTS[style] + content;
   
   try {
-    const response = await fetch('http://localhost:8787/generate', {
+    const response = await fetch(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
     
     const data = await response.json();
     
     if (data.error) {
-      res.json({ ok: false, error: data.error });
+      res.json({ ok: false, error: data.error.message || data.error });
     } else {
-      res.json({ ok: true, image: data.image });
+      const imageData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      res.json({ ok: true, image: imageData ? 'data:image/png;base64,' + imageData : '' });
     }
   } catch (e) {
     res.json({ ok: false, error: e.message });
