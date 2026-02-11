@@ -167,3 +167,20 @@ app.get('/api/orders', (req, res) => {
 });
 
 app.listen(3000, () => console.log('Server running'));
+
+// Admin API: 获取所有用户
+app.get('/api/users', (req, res) => {
+  const users = db.prepare('SELECT id, username, balance, created_at FROM users ORDER BY created_at DESC').all();
+  res.json(users);
+});
+
+// Admin API: 获取所有订单
+app.get('/api/admin/orders', (req, res) => {
+  const orders = db.prepare(`
+    SELECT o.*, u.username 
+    FROM orders o 
+    LEFT JOIN users u ON o.user_id = u.id 
+    ORDER BY o.created_at DESC
+  `).all();
+  res.json(orders);
+});
