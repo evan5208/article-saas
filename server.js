@@ -3,14 +3,15 @@ import session from 'express-session';
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync, readFileSync } from 'fs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const app = express();
-const db = new Database('data.db');
+const db = new Database(join(__dirname, 'data.db'));
 
 const API_KEY = 'AIzaSyCWZhr9vVaNJHXULNCxhN1gtWg4tbCmlFo';
 
-// 提示词模板
 const PROMPTS = {
   cartoon: `请根据输入内容提取核心主题与要点，生成一张卡通风格的信息图：
 - 采用手绘风格，横版（16:9）构图。
@@ -32,7 +33,6 @@ const PROMPTS = {
 内容：`
 };
 
-// 初始化数据库
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +57,16 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use(session({ secret: 'key', resave: false, saveUninitialized: false }));
 
-// 注册 - 送1次免费
+// Admin 页面
+app.get('/admin', (req, res) => {
+  const adminPath = join(__dirname, 'admin', 'index.html');
+  if (existsSync(adminPath)) {
+    res.sendFile(adminPath);
+  } else {
+    res.send('<html><body style="background:#0C0A09;color:#FAFAF9;font-family:Inter,sans-serif;padding:20px;"><h1>管理端</h1><p>请先创建 admin/index.html</p></body></html>');
+  }
+});
+
 app.post('/api/register', (req, res) => {
   const { username, password } = req.body;
   try {
@@ -71,7 +80,6 @@ app.post('/api/register', (req, res) => {
   }
 });
 
-// 登录
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE username = ? AND password = ?').get(username, password);
@@ -84,44 +92,32 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// 获取用户信息
 app.get('/api/me', (req, res) => {
   if (req.session.userId) {
-    const user = db.prepare('SELECT id, username, balance, free_used FROM users WHERE id = ?').get(req.session.userId);
+    const user = db.prepare('SELECT id, username, balance FROM users WHERE id = ?').get(req.session.userId);
     res.json({ ok: true, user });
   } else {
     res.json({ ok: false });
   }
 });
 
-// 退出
 app.post('/api/logout', (req, res) => {
   req.session.destroy();
   res.json({ ok: true });
 });
 
-// 生成图片
 app.post('/api/generate', async (req, res) => {
   const { content, style } = req.body;
   const userId = req.session.userId;
   
   if (userId) {
-    const user = db.prepare('SELECT balance, free_used FROM users WHERE id = ?').get(userId);
+    const user = db.prepare('SELECT balance FROM users WHERE id = ?').get(userId);
     if (user.balance <= 0) {
       return res.json({ ok: false, error: '余额不足，请充值', needRecharge: true });
     }
-    // 扣费
     db.prepare('UPDATE users SET balance = balance - 1 WHERE id = ?').run(userId);
-  } else {
-    // 未登录用户，检查IP限制（简化版用session检查）
-    if (!req.session.freeUsed) {
-      req.session.freeUsed = true;
-    } else {
-      return res.json({ ok: false, error: '免费次数已用完，请登录后充值', needLogin: true });
-    }
   }
   
-  // 组合完整提示词
   const prompt = PROMPTS[style] + content;
   
   try {
@@ -130,9 +126,7 @@ app.post('/api/generate', async (req, res) => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       }
     );
     
@@ -149,7 +143,6 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
-// 创建充值订单 - 1 USDT = 20次
 app.post('/api/order', (req, res) => {
   if (!req.session.userId) return res.json({ ok: false, error: '请先登录' });
   const { amount } = req.body;
@@ -157,7 +150,6 @@ app.post('/api/order', (req, res) => {
   res.json({ ok: true, orderId: orderId.lastInsertRowid, address: 'TMwNkxTKRPE7DDiXPkzm6hXQ1LV9aQ9gfN', amount });
 });
 
-// 确认充值
 app.post('/api/admin/confirm', (req, res) => {
   const { orderId, txHash } = req.body;
   db.prepare('UPDATE orders SET status = "completed", tx_hash = ? WHERE id = ?').run(txHash, orderId);
@@ -168,7 +160,6 @@ app.post('/api/admin/confirm', (req, res) => {
   res.json({ ok: true });
 });
 
-// 获取用户订单
 app.get('/api/orders', (req, res) => {
   if (!req.session.userId) return res.json({ ok: false, error: '请先登录' });
   const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(req.session.userId);
